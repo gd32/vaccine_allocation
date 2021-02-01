@@ -4,3 +4,5 @@
 .Ruserdata
 .mtx
 .csv
+*.csv
+*.mtx
