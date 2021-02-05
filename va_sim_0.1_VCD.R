@@ -19,7 +19,7 @@ n = 1000 #n = 10000 For later
 p = 0.2 #rewiring rate for Watts-Strogatz small world model
 
 #Number of iterations
-iters = 1 #n = 1000 for later
+iters = 100 #n = 1000 for later
 
 #Create network result vector
 net_result = data.frame(h=1:iters,
@@ -30,7 +30,7 @@ net_result = data.frame(h=1:iters,
 
 setwd("C:/Users/George/Documents/vaccine_alloc/Log")
 
-## Do it this way?
+## Create network
 for(h in 1:iters){
   set.seed(h)
   g0 = sample_smallworld(dim = 1, size = n, nei = 7, p = p) #How to set transitivity = 0.18?
@@ -92,7 +92,7 @@ i_period = 3
 r_period = 300
 period = 300
 available_vaccines = 50 #500 for 10000 people
-iters = 1
+iters = 100
 # infection_rate = 0.005
 
 # sim_result = c(0, rep(0, period+1), rep(0, period+1), rep(0, period+1))
@@ -101,14 +101,6 @@ sim_result_sym = NULL
 sim_result_total_pv = NULL 
 sim_result_sym_pv = NULL
 
-# names(sim_result) = c("h",
-#                       paste0("n_",0:period),#n_x = x-th round new exposure (infection)
-#                       paste0("p_",0:period),#p_x = x-th round prevalence
-#                       paste0("c_",0:period))#c_x = x-th round cumulative incidence,
-
-#interpret diagnosed and symptomatic as the same - these are the people who can be vaccinated 
-
-# Count CI of only symptomatic individuals
 
 for (h in 1:iters) {
   # h = 1
@@ -116,12 +108,6 @@ for (h in 1:iters) {
   
   ndata1 = read.csv(paste0("ndata_R0_h",h,"_0203.csv"))
   xdata0 = readMM(paste0("xdata_h",h,"_0203.mtx"))
-  #%# modified in R5 (a: weak ties only/b: close ties only)
-  
-  #For quality check (N=80)
-  #setwd("/Users/akihironishi/Dropbox/ArticlesAN/AN20COVI4/RC/sample") 
-  #ndata1 = read.csv(paste0("ndata1_sample_s",s,"_h",h,"_0801.csv"))
-  #xdata0 = readMM(paste0("xdata0_sample_0801_s",s,"_h",h,".mtx"))
   
   #4.2. Setting in ndata1
   ndata1$state  = sample(c(rep(1, seed_number), #state2=#infectious, #state1=E (#seed=1),#state3=R
@@ -207,7 +193,7 @@ for (h in 1:iters) {
         ndata1$new_i = 0
         ndata1$new_r = 0
       } else {
-      print(paste0("Sim stopped when CI among symptomatic individuals reached 10% at round ",m))
+      print(paste0("Sim ",h," stopped when CI among symptomatic individuals reached 10% at round ",m))
       halt_round = m
       break
       }  
@@ -235,9 +221,9 @@ for (h in 1:iters) {
     cis_pv = tail(cis, 1) #cumulative incidences vector (first component)
     prevs_pv = tail(prevs, 1) #prevalence (proportion of the latent/infectious people)
     
-    # n_sym_pv = n_sym #number of symptomatics 
-    ci_sym_pv = tail(ci_sym, 1) #CI among symptomatics
-    prev_sym_pv = tail(prev_sym, 1) #Prevalence among symptomatics
+    # n_sym_pv = n_sym #number of symptomatic 
+    ci_sym_pv = tail(ci_sym, 1) #CI among symptomatic
+    prev_sym_pv = tail(prev_sym, 1) #Prevalence among symptomatic
     
     for (m in halt_round+1:remaining_period){ 
     
@@ -340,15 +326,12 @@ for (h in 1:iters) {
         sim_result_sym_pv = bind_rows(sim_result_sym_pv, result_vector_sym_pv)
         
 }
-
+sim_result_total_pv = select(sim_result_total_pv, -(836:856))
+sim_result_sym_pv = select(sim_result_sym_pv, -(836:856))
 
 #Save results
 
-sim_result_total
-sim_result_sym
-sim_result_total_pv
-sim_result_sym_pv
-view(sim_result_sym_pv)
-sim_result_sym_pv %>% select(contains("300"))
-to_save = sim_result %>% filter(h != 0)
-# write_csv(to_save, file = paste0("sim_result_pre_vac_0203.csv"))
+setwd("C:/Users/George/Documents/vaccine_alloc/Results")
+
+write_csv(sim_result_total_pv, "sim_result_post_vac_VCD_0205.csv")
+write_csv(sim_result_sym_pv, "sim_result_post_vac_sym_only_VCD_0205.csv")
