@@ -36,7 +36,7 @@ for(h in 1:iters){
   g0 = sample_smallworld(dim = 1, size = n, nei = 7, p = p) #How to set transitivity = 0.18?
   xdata = as_adjacency_matrix(g0)
   diag(xdata) = 0
-  writeMM(obj = xdata, file = paste0("xdata_h", h, "_0203.mtx"))
+  writeMM(obj = xdata, file = paste0("xdata_h", h, "_0203.txt"))
   
   #Checking network appearance
   # plot(g0, layout = layout.kamada.kawai, vertex.size = 5, vertex.label = NA)
@@ -115,7 +115,7 @@ for (h in 1:iters) {
   set.seed(h)
   
   ndata1 = read.csv(paste0("ndata_R0_h",h,"_0203.csv"))
-  xdata0 = readMM(paste0("xdata_h",h,"_0203.mtx"))
+  xdata0 = readMM(paste0("xdata_h",h,"_0203.txt"))
 
   
   #For quality check (N=80)
