@@ -95,7 +95,7 @@ e_period = 3
 i_period = 3
 r_period = 300
 period = 300
-available_vaccines = 50 #500 for 10000 people
+available_vaccines = 500 #500 for 10000 people - 200? 500?
 iters = 100
 
 sim_result_total = NULL
@@ -147,10 +147,12 @@ for (h in 1:iters) {
       #NOTE: The taf for the state chage is "state_end", which turns to be the same as the present "round"
       
       #A0 - Add cases per round from outside the network
+      if(m %in% 1:42*7){
       selected_ID = sample(ndata1[ndata1$state == 0, "ID"],size = seed_number, replace=F)
       ndata1[ndata1$ID %in% selected_ID,"state"] = 1 
       ndata1[ndata1$ID %in% selected_ID,"new_e"] = 1 
       ndata1[ndata1$ID %in% selected_ID,"state_end"] = m + e_period  
+      }
       
       #A1. E(1) to I(4 or 5)
       ndata1[ndata1$state == 1 & (ndata1$round == ndata1$state_end),"new_i"] = 1
@@ -197,6 +199,7 @@ for (h in 1:iters) {
       ndata1$new_e = 0
       ndata1$new_i = 0
       ndata1$new_r = 0
+      
     } else {
       print(paste0("Sim ",h," stopped when CI among symptomatic individuals reached 10% at round ",m))
       halt_round = m
@@ -208,28 +211,29 @@ for (h in 1:iters) {
   remaining_period = period - halt_round
   
   #Strategy 3 - Vaccinating the top 10 by betweenness centrality - remove previously diagnosed (symptomatic + state = 5 or 6) or vaccinated every time
-   `%notin%` <- Negate(`%in%`)
+  `%notin%` <- Negate(`%in%`)
   
-   ndata2 = ndata1
+  ndata2 = ndata1
   
-   g1 = graph_from_adjacency_matrix(xdata0 * 1)
-   g1 = set_vertex_attr(g1, "name", value = 1:length(V(g1)))
-   ids_to_drop = ndata2 %>% filter(symptomatic == 1 & state %in% 5:6 | vaccinated == 1) %>% select(ID) 
-   v_ids_to_drop = unlist(ids_to_drop)
-   g1 = delete_vertices(g1, as.character(v_ids_to_drop))
-   top10_vec = NULL
-   
-   for(k in 1:5){
-       top10 = sort(betweenness(g1), decreasing = TRUE)[1:10]
-       top10_ids = names(top10)
-       ndata2[ndata2$ID %in% as.numeric(top10_ids), "vaccinated"] = 1
-       g1 = delete_vertices(g1, top10_ids)
-       top10_vec = c(top10_vec, top10_ids)
-       print(gorder(g1))
-       print(length(top10_vec))
-       print(length(unique(top10_vec)))
-    }
+  g1 = graph_from_adjacency_matrix(xdata0 * 1)
+  g1 = set_vertex_attr(g1, "name", value = 1:length(V(g1)))
+  ids_to_drop = ndata2 %>% filter(symptomatic == 1 & state %in% 5:6 | vaccinated == 1) %>% select(ID) 
+  v_ids_to_drop = unlist(ids_to_drop)
+  g1 = delete_vertices(g1, as.character(v_ids_to_drop))
+  top10_vec = NULL
+  
+  for(k in 1:available_vaccines){
+    top10 = sort(betweenness(g1), decreasing = TRUE)[1]
+    top10_ids = names(top10)
+    ndata2[ndata2$ID %in% as.numeric(top10_ids), "vaccinated"] = 1
+    g1 = delete_vertices(g1, top10_ids)
+    top10_vec = c(top10_vec, top10_ids)
 
+    if(k == available_vaccines){
+      print(paste0(k, " vaccines done at ", Sys.time(), " for iteration ", h))
+    }
+  }
+  
   ndata1[ndata1$ID %in% as.numeric(top10_vec), "vaccinated"] = 1
   
   #Continue simulation as before until full period is reached
@@ -242,21 +246,20 @@ for (h in 1:iters) {
   ci_sym_pv = tail(ci_sym, 1) #CI among symptomatics
   prev_sym_pv = tail(prev_sym, 1) #Prevalence among symptomatics
   
-  for (m in halt_round+1:remaining_period){ 
+  for (m in halt_round+1:period){ 
     
     ndata1$round = m
     
     #Step A. Implement first all the automatic changes when the day/round changes
     #NOTE: The taf for the state change is "state_end", which turns to be the same as the present "round"
-    
-    #If people are vaccinated (regardless of what state they were in), they go directly to V(7)
-    ndata1[ndata1$vaccinated == 1, "state"] = 7
-    
+
     #A0 - Add cases per round from outside the network
+    if(m %in% 1:42*7){
     selected_ID = sample(ndata1[ndata1$state == 0, "ID"],size = seed_number, replace=F) #Only susceptibles can be new infections
     ndata1[ndata1$ID %in% selected_ID,"state"] = 1 
     ndata1[ndata1$ID %in% selected_ID,"new_e"] = 1 
     ndata1[ndata1$ID %in% selected_ID,"state_end"] = m + e_period  
+    }
     
     #A1. E(1) to I(4 or 5)
     ndata1[ndata1$state == 1 & (ndata1$round == ndata1$state_end),"new_i"] = 1
@@ -285,7 +288,7 @@ for (h in 1:iters) {
     #NOTE: people with S(0) gets infected from individuals who are not self-isolated = I(4) or I(5)
     #NOTE: sum them all (with weights) are the number of contacts in the present round
     ndata1$new_e = as.numeric(lapply(1-(1-infection_rate)^(ndata1$contacts), sample1)) #possible infections 
-    ndata1$new_e = ifelse(ndata1$state==0,ndata1$new_e,0) #only state=0 can get a new infection (latent period)
+    ndata1$new_e = ifelse(ndata1$state==0 & ndata1$vaccinated == 0,ndata1$new_e,0) #only state=0 can get a new infection (latent period)
     ndata1[ndata1$state==0 & ndata1$new_e==1,"state"] = 1 
     ndata1[ndata1$state==1 & ndata1$new_e==1,"state_end"] = ndata1[ndata1$state==1 & ndata1$new_e==1,"round"] + e_period
     
@@ -341,10 +344,10 @@ for (h in 1:iters) {
   sim_result_total_pv = bind_rows(sim_result_total_pv, result_vector_total_pv)
   sim_result_sym_pv = bind_rows(sim_result_sym_pv, result_vector_sym_pv)
   
+  print(paste0("Sim ",h, " is done at ", Sys.time()))
+  
 }
+setwd("~/vaccine_alloc/Results")
 
-sim_result_total_pv = select(sim_result_total_pv, -(836:856))
-sim_result_sym_pv = select(sim_result_sym_pv, -(836:856))
-
-write_csv(sim_result_total_pv, "sim_result_post_vac_VHC_0205.csv")
-write_csv(sim_result_sym_pv, "sim_result_post_vac_sym_only_VHC_0205.csv")
+write_csv(sim_result_total_pv, "sim_result_post_vac_VHC_1cperweek_block1_v500_0205.csv")
+write_csv(sim_result_sym_pv, "sim_result_post_vac_VHC_1cperweek_block1_v500_sym_only_0205.csv")
